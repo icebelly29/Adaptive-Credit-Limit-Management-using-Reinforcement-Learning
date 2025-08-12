@@ -7,14 +7,15 @@ This project trains a PPO agent (Stable-Baselines3) in a custom Gymnasium enviro
 It includes a **static baseline policy** for comparison, **synthetic data generation**, robust **evaluation & plotting**, and optional **stress tests** (recession shock) and **explainability hooks**.
 
 
+## How to run
+
 ### optional: clear caches
-```powershell
+```cmd
 rmdir /s /q __pycache__ 2> NUL
 for /d %D in (*) do if exist "%D\__pycache__" rmdir /s /q "%D\__pycache__"
 ```
-
-## How to run
-```bash
+### run:
+```cmd
 python -m pip install -r requirements.txt
 python baseline_policy.py
 python train_rl_agent.py

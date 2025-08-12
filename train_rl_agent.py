@@ -1,91 +1,63 @@
 from __future__ import annotations
 from pathlib import Path
-
-import numpy as np
-import pandas as pd
-
-# Gymnasium preferred (not directly used here but good to keep consistent)
+import argparse, numpy as np, pandas as pd
 try:
-    import gymnasium as gym  # noqa: F401
+    import gymnasium as gym  # noqa
 except ImportError:
-    import gym  # noqa: F401
-
+    import gym  # noqa
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor, VecNormalize
 from stable_baselines3.common.logger import configure
 
 from credit_limit_env import CreditLimitEnv, EnvConfig
 from synthetic_data import SynthConfig, generate_all
+from data_io import load_from_parquet, load_from_hive
 
-
-def make_env(customers: pd.DataFrame, macro: pd.DataFrame, seed: int = 0):
+def make_env(customers: pd.DataFrame, macro: pd.DataFrame, seed: int = 0, months: int = 60):
     def _thunk():
-        # Horizon aligned to evaluation (60)
-        cfg = EnvConfig(seed=seed, months=60)
-        env = CreditLimitEnv(customers, macro, cfg)
-        return env
+        cfg = EnvConfig(seed=seed, months=months)
+        return CreditLimitEnv(customers, macro, cfg)
     return _thunk
 
-
 def main():
-    np.random.seed(0)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data-source", choices=["synthetic","parquet","hive"], default="synthetic")
+    ap.add_argument("--parquet-dir", default="data")
+    ap.add_argument("--hive-db", default="credit_rl")
+    ap.add_argument("--timesteps", type=int, default=1_000_000)
+    ap.add_argument("--parallel-envs", type=int, default=8)
+    ap.add_argument("--device", default="cuda")  # set "cpu" if no GPU
+    args = ap.parse_args()
 
-    out_dir = Path("outputs")
-    (out_dir / "logs").mkdir(parents=True, exist_ok=True)
-    (out_dir / "models").mkdir(parents=True, exist_ok=True)
+    out = Path("outputs"); (out/"logs").mkdir(parents=True, exist_ok=True); (out/"models").mkdir(parents=True, exist_ok=True)
 
-    # Data (with an optional macro shock mid-way to add variety)
-    synth_cfg = SynthConfig(num_customers=1000, months=60, shock_enabled=True, shock_month=24)
-    customers, macro = generate_all(synth_cfg)
+    # Load data
+    if args.data_source=="synthetic":
+        customers, macro = generate_all(SynthConfig(num_customers=1000, months=60, seed=7))
+    elif args.data_source=="parquet":
+        customers, macro = load_from_parquet(args.parquet_dir)
+    else:
+        customers, macro = load_from_hive(args.hive_db)
 
-    # Parallel vectorized envs
-    env_fns = [make_env(customers, macro, seed=s) for s in range(8)]
+    # Vec envs
+    env_fns = [make_env(customers, macro, seed=s, months=60) for s in range(args.parallel_envs)]
     vec = DummyVecEnv(env_fns)
-    vec = VecMonitor(vec, filename=str(out_dir / "logs" / "monitor.csv"))
+    vec = VecMonitor(vec, filename=str(out/"logs"/"monitor.csv"))
     vec = VecNormalize(vec, norm_obs=True, norm_reward=True, clip_obs=10.0, clip_reward=10.0)
 
-    # PPO model on GPU with a slightly larger net/batches for stability
     model = PPO(
-        policy="MlpPolicy",
-        env=vec,
-        device="cuda",                   # use your NVIDIA GPU
-        n_steps=2048,
-        batch_size=2048,
-        learning_rate=3e-4,
-        gamma=0.995,
-        gae_lambda=0.95,
-        ent_coef=0.02,
-        clip_range=0.2,
-        policy_kwargs=dict(net_arch=[dict(pi=[256, 256], vf=[256, 256])]),
-        tensorboard_log=str(out_dir / "logs" / "tb"),
-        verbose=1,
-        seed=0,
+        "MlpPolicy", vec, device=args.device,
+        n_steps=2048, batch_size=2048, learning_rate=3e-4,
+        gamma=0.995, gae_lambda=0.95, ent_coef=0.02, clip_range=0.2,
+        policy_kwargs=dict(net_arch=[dict(pi=[256,256], vf=[256,256])]),
+        tensorboard_log=str(out/"logs"/"tb"), verbose=1, seed=0,
     )
+    model.set_logger(configure(str(out/"logs"), ["stdout","csv","tensorboard"]))
+    model.learn(total_timesteps=args.timesteps, progress_bar=True)
 
-    # Custom logger (stdout + csv + TB)
-    new_logger = configure(str(out_dir / "logs"), ["stdout", "csv", "tensorboard"])
-    model.set_logger(new_logger)
-
-    # Train (~1M timesteps; adjust down if you want it faster)
-    total_timesteps = 1_000_000
-    model.learn(total_timesteps=total_timesteps, progress_bar=True)
-
-    # Save model
-    model_path = out_dir / "models" / "ppo_credit_limit.zip"
-    model.save(model_path)
-
-    # Save VecNormalize stats (so we can normalize obs at evaluation)
-    stats_path = out_dir / "models" / "vec_stats.npz"
-    np.savez(
-        stats_path,
-        mean=vec.obs_rms.mean,
-        var=vec.obs_rms.var,
-        clip_obs=vec.clip_obs,
-    )
-
-    print(f"Saved model to: {model_path}")
-    print(f"Saved normalization stats to: {stats_path}")
-
+    model.save(out/"models"/"ppo_credit_limit.zip")
+    np.savez(out/"models"/"vec_stats.npz", mean=vec.obs_rms.mean, var=vec.obs_rms.var, clip_obs=vec.clip_obs)
+    print("Saved:", out/"models"/"ppo_credit_limit.zip")
 
 if __name__ == "__main__":
     main()

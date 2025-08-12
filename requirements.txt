@@ -5,6 +5,10 @@ seaborn>=0.13
 gymnasium>=0.29.1
 stable-baselines3>=2.3.0
 tensorboard>=2.16
-# Optional extras (install later if you want)
-# shap>=0.45.0
-# streamlit>=1.36
+# Install PyTorch separately (CPU or CUDA). Examples:
+# CPU: pip install torch --index-url https://download.pytorch.org/whl/cpu
+# CUDA 12.1: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Optional big-data integration for training script when using Hive:
+pyspark>=3.5.0
+pyarrow>=15.0.0

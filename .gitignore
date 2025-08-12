@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Envs
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Build / Packaging
+build/
+dist/
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+
+# Tools / Tests
+.pytest_cache/
+.tox/
+.nox/
+.coverage*
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Project outputs
+outputs/**
+!outputs/.gitkeep
+
+# Data dumps
+data/**
+!data/.gitkeep
+
+# TensorBoard & monitors
+**/tb/**
+**/monitor.csv
+
+# Java / Maven
+java-serving/target/
