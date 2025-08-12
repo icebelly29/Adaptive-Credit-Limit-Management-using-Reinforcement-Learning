@@ -1,0 +1,10 @@
+numpy>=1.26
+pandas>=2.2
+matplotlib>=3.8
+seaborn>=0.13
+gymnasium>=0.29.1
+stable-baselines3>=2.3.0
+tensorboard>=2.16
+# Optional extras (install later if you want)
+# shap>=0.45.0
+# streamlit>=1.36
