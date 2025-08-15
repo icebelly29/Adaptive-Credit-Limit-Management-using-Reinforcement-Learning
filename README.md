@@ -1,10 +1,11 @@
 # Adaptive Credit Limit Management using Reinforcement Learning
 
-This project trains a PPO agent (Stable-Baselines3) in a custom Gymnasium environment to **dynamically adjust credit card limits** based on:
-- Customer features (utilization, spend, repayment behavior)
-- Macroeconomic indicators (interest rate, unemployment)
 
-It includes a **static baseline policy** for comparison, **synthetic data generation**, robust **evaluation & plotting**, and optional **stress tests** (recession shock) and **explainability hooks**.
+End-to-end project with:
+- **RL (Python, PyTorch, SB3, Gymnasium)** for credit limit adjustment
+- **Big Data (PySpark + Hive)** to generate/hold large synthetic cohorts
+- **Scala Spark** KPI job (optional)
+- **Java (DJL + TorchScript)** to serve the trained policy
 
 
 ## How to run
